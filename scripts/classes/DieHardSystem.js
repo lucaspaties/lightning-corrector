@@ -1,0 +1,454 @@
+import {dieHardLog, makeId} from "../lib/helpers.js";
+import DieHardFudgeRoll from "./DieHardFudgeRoll.js";
+import DieHard, {DieHardSetting} from "./DieHard.js";
+
+export default class DieHardSystem {
+  constructor() {
+    dieHardLog(false, 'DieHardSystem.constructor');
+    dieHardLog(false, 'DieHardSystem.constructor - Foundry version:', game.version);
+
+    // Total rolls - v13 uses CONFIG.Dice.Roll
+    libWrapper.register('foundry-die-hard', 'CONFIG.Dice.Roll.prototype.evaluate', this.wrapRollEvaluate, 'WRAPPER');
+
+    // Raw rolls - v13 uses CONFIG.Dice.termTypes.DiceTerm
+    if (CONFIG.Dice.termTypes?.DiceTerm) {
+      libWrapper.register('foundry-die-hard', 'CONFIG.Dice.termTypes.DiceTerm.prototype.roll', this.wrapDiceTermRoll, 'MIXED');
+    }
+
+    // Register the fudge roll class
+    CONFIG.Dice.DieHardFudgeRoll = DieHardFudgeRoll;
+
+    this.totalRollClassName = []
+    this.fudgeWhatOptions = []
+    this.fudgeWhatRawOptions = [
+      { id: 'rawd100', name: 'Raw d100' },
+      { id: 'rawd20', name: 'Raw d20' },
+      { id: 'rawd12', name: 'Raw d12' },
+      { id: 'rawd10', name: 'Raw d10' },
+      { id: 'rawd8', name: 'Raw d8' },
+      { id: 'rawd6', name: 'Raw d6' },
+      { id: 'rawd4', name: 'Raw d4' }
+    ]
+    this.fudgeWhatTotalOptions = [
+      { id: 'totald100', name: 'Total d100' },
+      { id: 'totald20', name: 'Total d20' },
+      { id: 'totald12', name: 'Total d12' },
+      { id: 'totald10', name: 'Total d10' },
+      { id: 'totald8', name: 'Total d8' },
+      { id: 'totald6', name: 'Total d6' },
+      { id: 'totald4', name: 'Total d4' }
+    ]
+  }
+
+  evalFudge(result, operator, operatorValue) {
+    dieHardLog(false, 'DieHardSystem.evalFudge', result, operator, operatorValue);
+    switch (operator) {
+      case '>':
+        return result > operatorValue;
+      case '<':
+        return result < operatorValue;
+      case '>=':
+        return result >= operatorValue;
+      case '<=':
+        return result <= operatorValue;
+      case '!=':
+        return result !== operatorValue;
+      case '=':
+        return result === operatorValue;
+    }
+  }
+
+  isBetterFudge(oldTotal, newTotal, operator, operatorValue) {
+    dieHardLog(false, 'DieHardSystem.isBetterFudge', oldTotal, newTotal, operator, operatorValue);
+    switch (operator) {
+      case '>':
+        return newTotal > oldTotal;
+      case '<':
+        return newTotal < oldTotal;
+      case '>=':
+        return newTotal >= oldTotal;
+      case '<=':
+        return newTotal <= oldTotal;
+      case '!=':
+        return false;
+      case '=':
+        return false;
+    }
+  }
+
+  getUserFudge(fudgeType) {
+    dieHardLog(false, 'DieHardSystem.getUserFudge');
+    const currentUser = game.user;
+    let userFudges = currentUser.getFlag('foundry-die-hard', 'fudges');
+    dieHardLog(false, 'DieHardSystem.getUserFudge - userFudges', userFudges);
+    if (!Array.isArray(userFudges)) {
+      return null
+    }
+    let fudgeIndex = userFudges.findIndex(element => {
+      return ((element.whatId === fudgeType) && (element.statusActive));
+    });
+    dieHardLog(false, 'DieHardSystem.getUserFudge - fudgeIndex', fudgeIndex, fudgeType);
+    if (fudgeIndex !== -1) {
+      return userFudges[fudgeIndex]
+    } else {
+      return null
+    }
+  }
+
+  disableUserFudge(fudgeId) {
+    dieHardLog(false, 'DieHardSystem.disableUserFudge');
+    const currentUser = game.user;
+    let userFudges = currentUser.getFlag('foundry-die-hard', 'fudges');
+    let fudgeIndex = userFudges.findIndex(element => {
+      return (element.id === fudgeId);
+    });
+    userFudges[fudgeIndex].statusActive = false
+    currentUser.setFlag('foundry-die-hard', 'fudges', userFudges);
+    DieHard.refreshDieHardIcons()
+  }
+
+  /**
+   * Wrapper for raw dice
+   * @param wrapped
+   * @param eval_options
+   * @returns {{result: undefined, active: boolean}|*}
+   */
+  wrapDiceTermRoll(wrapped, eval_options) {
+    let functionLogName = 'DieHardSystem.wrapDiceTermRoll'
+    dieHardLog(false, functionLogName);
+
+    if (!DieHardSetting('fudgeEnabled')) {
+      dieHardLog(false, functionLogName + ' - Fudge disabled');
+    } else if (DieHardSetting('dieHardSettings').fudgeConfig.globallyDisabled) {
+      dieHardLog(false, functionLogName + ' - Fudging Globally disabled');
+    } else {
+      // Check if user has an active raw fudge
+      let userFudge = game.dieHardSystem.getUserFudge('rawd' + this.faces)
+      dieHardLog(false, functionLogName + ' - userFudge', userFudge);
+      if (userFudge !== null) {
+        dieHardLog(false, functionLogName + ' - active user raw fudge', userFudge);
+
+        // Time to make the fudge
+        let gen_new_result = true;
+        let failedRolls = [];
+        let SafetyLoopIndex = DieHardSetting('dieHardSettings').fudgeConfig.maxFudgeAttemptsPerRoll;
+        let newResult = undefined
+        let roll = {result: undefined, active: true};
+        while (gen_new_result && SafetyLoopIndex > 0) {
+          SafetyLoopIndex--;
+
+          // Debug override
+          if (DieHardSetting('debugDieResultEnabled') && newResult === undefined) {
+            let debugResult = DieHardSetting('debugDieResult')
+            dieHardLog(false, functionLogName + ' - debugDieResult used to change ' + newResult + ' to ' + debugResult);
+            DieHard.dmToGm('debugDieResult used to change ' + newResult + ' to ' + debugResult);
+            newResult = debugResult
+          } else {
+            // Generate random result using v13 API
+            if (eval_options.minimize) roll.result = Math.min(1, this.faces);
+            else if (eval_options.maximize) newResult = this.faces;
+            else newResult = Math.ceil(CONFIG.Dice.randomUniform() * this.faces);
+          }
+
+          let evalResult = game.dieHardSystem.evalFudge(newResult, userFudge.operator, userFudge.operatorValue)
+          if (evalResult) {
+            dieHardLog(false, functionLogName + ' - New result: ' + newResult)
+            gen_new_result = false;
+            roll.result = newResult
+            this.results.push(roll);
+            DieHard.dmToGm("Raw Fudge (" + userFudge.howFormula + ")<br>Values: " + failedRolls.join(', ') + "<br>Final: " + newResult);
+          } else {
+            // New roll is insufficient, but lets at least check if it is "closer"
+            if (game.dieHardSystem.isBetterFudge(roll.result, newResult, userFudge.operator, userFudge.operatorValue)) {
+              dieHardLog(false, functionLogName + ' - New result insufficient, but at least better (' + newResult + ").  Try again (tries left: " + SafetyLoopIndex + ")...")
+              roll.result = newResult
+            } else {
+              dieHardLog(false, functionLogName + ' - New result insufficient (' + newResult + ").  Try again (tries left: " + SafetyLoopIndex + ")...")
+            }
+            failedRolls.push(newResult);
+          }
+        }
+        if (SafetyLoopIndex === 0) {
+          dieHardLog(false, functionLogName + ' - Tried until retry safety killed...');
+          DieHard.dmToGm('DieHard-Fudge: Gave up trying to fudge; loop safety reached...');
+        }
+        if (userFudge.statusEndless) {
+          dieHardLog(false, functionLogName + ' - fudge is endless');
+        } else {
+          game.dieHardSystem.disableUserFudge(userFudge.id)
+        }
+        // Return the fudged roll
+        return roll
+      }
+    }
+    return wrapped(eval_options)
+  }
+
+  /**
+   * Wrapper for a total roll
+   * @param wrapped
+   * @param eval_options
+   * @returns {*}
+   */
+  wrapRollEvaluate(wrapped, eval_options) {
+    let uuid = makeId(6)
+    let functionLogName = 'DieHardSystem.wrapRollEvaluate-' + uuid
+    dieHardLog(false, functionLogName);
+
+    if (!DieHardSetting('fudgeEnabled')) {
+      dieHardLog(false, functionLogName + ' - Fudge disabled');
+    } else if (DieHardSetting('dieHardSettings').fudgeConfig.globallyDisabled) {
+      dieHardLog(false, functionLogName + ' - Fudging Globally disabled');
+    } else {
+      // Check if a total die roll (otherwise some type of system specific roll)
+      if (game.dieHardSystem.totalRollClassName.indexOf(this.constructor.name) !== -1) {
+        dieHardLog(false, functionLogName + ' - total roll; figure out if needs to be fudged or is a recursive fudge');
+
+        for (let die in this.dice) {
+          if (typeof this.dice[die] === 'function') {
+            dieHardLog(false, functionLogName + ' - die is function; ignore');
+            continue;
+          }
+
+          dieHardLog(false, functionLogName + ' - dice faces', this.dice[die].faces);
+          let userFudge = game.dieHardSystem.getUserFudge('totald' + this.dice[die].faces)
+          if (userFudge !== null) {
+            dieHardLog(false, functionLogName + ' - active user total fudge', userFudge);
+            foundry.utils.mergeObject(this, {
+              data: {
+                fudge: true,
+                fudgeOperator: userFudge.operator,
+                fudgeOperatorValue: userFudge.operatorValue,
+                fudgeHow: userFudge.howFormula
+              }
+            });
+
+            if (userFudge.statusEndless) {
+              dieHardLog(false, functionLogName + ' - fudge is endless');
+            } else {
+              game.dieHardSystem.disableUserFudge(userFudge.id)
+            }
+            // This is a root roll, so allow fudge re-roll
+            // Stop looking for more opportunities to fudge
+            break
+          }
+        }
+        let result = null
+        if (this.data.fudge !== undefined) {
+          result = wrapped({minimize: eval_options.minimize, maximize: eval_options.maximize, async: false})
+          dieHardLog(false, functionLogName + ' - roll can be fudged');
+          if (this instanceof CONFIG.Dice.DieHardFudgeRoll) {
+            dieHardLog(false, functionLogName + 'e - recursive roll', this);
+          } else {
+            dieHardLog(false, functionLogName + ' - base roll', this);
+            dieHardLog(false, functionLogName + ' - result', result);
+            let gen_new_result = false;
+            let evalResult = game.dieHardSystem.evalFudge(this.total, this.data.fudgeOperator, this.data.fudgeOperatorValue)
+
+            if (evalResult) {
+              dieHardLog(false, functionLogName + ' - Fudge not needed, but still disabled');
+              DieHard.dmToGm('DieHard-Fudge: Total Fudge not needed, but still disabled...');
+              dieHardLog(false, functionLogName + ' - dmToGm');
+
+            } else {
+              let failedRolls = [this.total];
+              gen_new_result = true;
+              dieHardLog(false, functionLogName + ' - Start fudging');
+              let SafetyLoopIndex = DieHardSetting('dieHardSettings').fudgeConfig.maxFudgeAttemptsPerRoll;
+              while (gen_new_result && SafetyLoopIndex > 0) {
+                SafetyLoopIndex--;
+                let new_roll = new DieHardFudgeRoll(this._formula, this.data, this.options)
+                new_roll.evaluate({async: false})
+                evalResult = game.dieHardSystem.evalFudge(new_roll.total, this.data.fudgeOperator, this.data.fudgeOperatorValue)
+                if (evalResult) {
+                  dieHardLog(false, functionLogName + ' - New result: ' + new_roll.total)
+                  gen_new_result = false;
+                  foundry.utils.mergeObject(this, new_roll, { recursive: false });
+                  DieHard.dmToGm("Total Fudge (" + result.data.fudgeHow + ")<br>Values: " + failedRolls.join(', ') + "<br>Final: " + new_roll.total);
+                } else {
+                  // New roll is insufficient, but lets at least check if it is "closer"
+                  if (game.dieHardSystem.isBetterFudge(this.total, new_roll.total, this.data.fudgeOperator, this.data.fudgeOperatorValue)) {
+                    dieHardLog(false, functionLogName + ' - New result insufficient, but at least better (' + new_roll.total + ").  Try again (tries left: " + SafetyLoopIndex + ")...")
+                    foundry.utils.mergeObject(this, new_roll, { recursive: false });
+                  } else {
+                    dieHardLog(false, functionLogName + ' - New result insufficient (' + new_roll.total + ").  Try again (tries left: " + SafetyLoopIndex + ")...")
+                  }
+                  failedRolls.push(new_roll.total);
+                }
+              }
+              if (SafetyLoopIndex === 0) {
+                dieHardLog(false, functionLogName + ' - Tried until retry safety killed...');
+                DieHard.dmToGm('DieHard-Fudge: Gave up trying to fudge; loop safety reached...');
+              }
+            }
+          }
+        } else {
+          result = wrapped(eval_options)
+        }
+        return result
+      }
+    }
+    return wrapped(eval_options)
+  }
+
+  /**
+   * Return an array of all users (map of id and name), defaulting to ones currently active
+   */
+  getUsers(activeOnly = true, includeFudges = false, getGM = false, userId = null) {
+    dieHardLog(false, 'DieHardSystem : getUsers', activeOnly, includeFudges, getGM, userId);
+    if (game.settings.get('foundry-die-hard', 'dieHardSettings').debug.allActors) {
+      activeOnly = false;
+    }
+    let activeUsers = [];
+    for (let userId of game.users.keys()) {
+      let curUser = game.users.get(userId);
+      let curUserType = curUser.isGM;
+      if (getGM) {
+        curUserType = !curUser.isGM;
+      }
+      if (activeOnly) {
+        if (!(curUserType) && curUser.active) {
+          let newUser = { id: userId, name: curUser.name };
+          if (includeFudges) {
+            newUser.fudges = curUser.getFlag('foundry-die-hard', 'fudges')
+            if (!Array.isArray(newUser.fudges)){
+              newUser.fudges = []
+            }
+          }
+          activeUsers.push(newUser)
+        }
+      } else {
+        if (!(curUserType)) {
+          let newUser = { id: userId, name: curUser.name };
+          if (includeFudges) {
+            newUser.fudges = curUser.getFlag('foundry-die-hard', 'fudges')
+            if (!Array.isArray(newUser.fudges)){
+              newUser.fudges = []
+            }
+          }
+          activeUsers.push(newUser)
+        }
+      }
+    }
+    return activeUsers;
+  }
+
+  /**
+   * Return an array of all fudges
+   */
+  getAllFudges() {
+    dieHardLog(false, 'DieHardSystem : getAllFudges')
+    let fudges = {
+      userFudges: this.getUsers(false, true),
+      gmFudges: this.getUsers(false, true, true)
+    }
+    return fudges;
+  }
+
+  /**
+   * Return true if there are any active fudges (GM or Actor)
+   */
+  hasActiveFudges() {
+    dieHardLog(false, 'DieHardSystem.hasActiveFudges')
+    let allFudges = this.getAllFudges()
+    dieHardLog(false, 'DieHardSystem.hasActiveFudges - allFudges', allFudges)
+    for (let fudgeType in allFudges) {
+      dieHardLog(false, 'DieHardSystem.hasActiveFudges - fudgeType', fudgeType)
+      for (let fudgeSource of allFudges[fudgeType]) {
+        try {
+          dieHardLog(false, 'DieHardSystem.hasActiveFudges - fudgeSource', fudgeSource)
+          dieHardLog(false, 'DieHardSystem.hasActiveFudges - fudgeSource.fudges.length', fudgeSource.fudges.length)
+          if (fudgeSource.fudges.length > 0) {
+            let fudgeIndex = fudgeSource.fudges.findIndex(element => {
+              return (element.statusActive);
+            });
+            dieHardLog(false, 'DieHardSystem.hasActiveFudges - fudgeIndex', fudgeIndex)
+            if (fudgeIndex !== -1) {
+              return true;
+            }
+          }
+        } catch (e) {
+          dieHardLog(false, 'DieHardSystem.hasActiveFudges - error', e)
+        }
+      }
+    }
+    return false;
+  }
+
+  async refreshActiveFudgesIcon() {
+    try {
+      if (this.hasActiveFudges()) {
+        document.getElementById('die-hard-fudge-icon').classList.add("die-hard-icon-active");
+      } else {
+        document.getElementById('die-hard-fudge-icon').classList.remove("die-hard-icon-active");
+      }
+    }
+    catch (e) { }
+  }
+
+  getFudgeWhatOptions() {
+    return this.fudgeWhatOptions;
+  }
+
+  getFudgeWhatRawOptions() {
+    return this.fudgeWhatRawOptions;
+  }
+
+  getFudgeWhatTotalOptions() {
+    return this.fudgeWhatTotalOptions;
+  }
+
+  /**
+   * Get an object of all who options
+   */
+  getFudgeWhoUserOptions() {
+    return this.getUsers()
+  }
+
+  getFudgeWhoGmOptions() {
+    return this.getUsers(true, false, true)
+  }
+
+  hookReady() {
+    dieHardLog(false, 'DieHardSystem : hookReady')
+  }
+
+  // game.dieHardSystem.deleteAllFudges()
+  deleteAllFudges() {
+    dieHardLog(false, 'DieHardSystem : deleteAllFudges')
+
+    // Players
+    let users = game.dieHardSystem.getUsers(false);
+    for (let user in users) {
+      try {
+        game.users.get(users[user].id).setFlag('foundry-die-hard', 'fudges', null)
+        game.users.get(users[user].id).setFlag('foundry-die-hard', 'activeFudges', null)
+        game.users.get(users[user].id).setFlag('foundry-die-hard', 'userFudges', null)
+      } catch (e) {
+      }
+    }
+
+    // GMs
+    let gms = game.dieHardSystem.getUsers(false, false, true);
+    for (let user in gms) {
+      try {
+        game.users.get(gms[user].id).setFlag('foundry-die-hard', 'fudges', null)
+        game.users.get(gms[user].id).setFlag('foundry-die-hard', 'activeFudges', null)
+        game.users.get(gms[user].id).setFlag('foundry-die-hard', 'userFudges', null)
+      } catch (e) {
+      }
+    }
+  }
+
+  disableAllFudges() {
+    dieHardLog(false, 'DieHardSystem : disableAllFudges', game.settings.get('foundry-die-hard', 'dieHardSettings').fudgeConfig.globallyDisabled)
+    let settings = game.settings.get('foundry-die-hard', 'dieHardSettings')
+    settings.fudgeConfig.globallyDisabled = !settings.fudgeConfig.globallyDisabled
+    game.settings.set('foundry-die-hard', 'dieHardSettings', settings)
+    DieHard.refreshDieHardIcons(settings.fudgeConfig.globallyDisabled);
+  }
+
+  static registerTests = context => {
+    dieHardLog(false, 'DieHardSystem : registerTests')
+  }
+}
