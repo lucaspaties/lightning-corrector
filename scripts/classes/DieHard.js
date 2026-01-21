@@ -134,6 +134,14 @@ export default class DieHard {
   static async refreshDieHardIcons(globallyDisabled = undefined) {
     dieHardLog(false, 'DieHard.refreshDieHardIcons');
     
+    // Guard against settings not being registered yet
+    try {
+      game.settings.get('lightning-corrector', 'dieHardSettings');
+    } catch (e) {
+      dieHardLog(false, 'DieHard.refreshDieHardIcons - Settings not ready yet');
+      return;
+    }
+    
     let iconDisabled;
     if (globallyDisabled === undefined) {
       iconDisabled = DieHardSetting('dieHardSettings').fudgeConfig.globallyDisabled;
