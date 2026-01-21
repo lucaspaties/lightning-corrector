@@ -9,8 +9,8 @@ export default class DieHardVersionNotification {
     let notificationVersion = 8
 
     // First time module is being loaded
-    if (game.user.isGM && game.user.getFlag('foundry-die-hard', 'versionNotification') !== notificationVersion) {
-      dieHardLog(false, functionLogName + ' - Send version notification', game.user.getFlag('foundry-die-hard', 'versionNotification'));
+    if (game.user.isGM && game.user.getFlag('lightning-corrector', 'versionNotification') !== notificationVersion) {
+      dieHardLog(false, functionLogName + ' - Send version notification', game.user.getFlag('lightning-corrector', 'versionNotification'));
       let commonHeader = "<p><b>Die Hard Module</b></p>"
       let commonFooter = "<p>To report problems:<ul><li>open a GitHub issue <a href='https://github.com/UranusBytes/foundry-die-hard/issues' target='_blank'>here</a></li><li>send a message on Discord to <a href='https://discordapp.com/users/530108795796455437' target='_blank'>Glutious#7241</a></li></ul></p>"
       let versionMessage = {
@@ -23,7 +23,7 @@ export default class DieHardVersionNotification {
           "</ul>"
       }
       let finalMessage = ""
-      let startVersion = game.user.getFlag('foundry-die-hard', 'versionNotification')
+      let startVersion = game.user.getFlag('lightning-corrector', 'versionNotification')
       dieHardLog(false, functionLogName + ' - startVersion', startVersion, isNaN(startVersion));
       if (!isNaN(startVersion) || startVersion < 8) {
         startVersion = 8
@@ -36,7 +36,7 @@ export default class DieHardVersionNotification {
       DieHard.dmToGm(commonHeader + finalMessage + commonFooter);
 
       // Update the saved version
-      game.user.setFlag('foundry-die-hard', 'versionNotification', notificationVersion)
+      game.user.setFlag('lightning-corrector', 'versionNotification', notificationVersion)
     }
   }
 }

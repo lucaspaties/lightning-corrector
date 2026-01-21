@@ -11,7 +11,7 @@ export default class DieHardFudgeDialog extends FormApplication {
       popOut: true,
       editable: game.user.isGM,
       width: 1000,
-      template: 'modules/foundry-die-hard/templates/die-hard-fudge-config.html',
+      template: 'modules/lightning-corrector/templates/die-hard-fudge-config.html',
       id: 'die-hard-fudge-config',
       title: 'Die Hard Fudge Config',
     });
@@ -273,7 +273,7 @@ export default class DieHardFudgeDialog extends FormApplication {
 
         dieHardLog(false, 'DieHardFudgeDialog : whoId', whoId);
         dieHardLog(false, 'DieHardFudgeDialog : who', who);
-        let whoFudges = who.getFlag('foundry-die-hard', 'fudges')
+        let whoFudges = who.getFlag('lightning-corrector', 'fudges')
         if (!Array.isArray(whoFudges)) {
           whoFudges = []
         }
@@ -315,7 +315,7 @@ export default class DieHardFudgeDialog extends FormApplication {
         }
 
         dieHardLog(false, 'DieHardFudgeDialog : Set Fudge', whoFudges);
-        await who.setFlag('foundry-die-hard', 'fudges', whoFudges);
+        await who.setFlag('lightning-corrector', 'fudges', whoFudges);
         this.pendingHowOperator = null;
         this.pendingHowOperatorValue = null;
       }
@@ -332,10 +332,10 @@ export default class DieHardFudgeDialog extends FormApplication {
     let whoId = event.currentTarget.dataset.who;
     let fudgeId = event.currentTarget.dataset.fudge
     let who = this._getWho(whoId)
-    let whoFudges = who.getFlag('foundry-die-hard', 'fudges')
+    let whoFudges = who.getFlag('lightning-corrector', 'fudges')
     let fudgeIndex = whoFudges.findIndex(element => { return element.id === fudgeId;});
     whoFudges.splice(fudgeIndex,1)
-    who.setFlag('foundry-die-hard', 'fudges', whoFudges);
+    who.setFlag('lightning-corrector', 'fudges', whoFudges);
     this.render()
   }
 
@@ -347,10 +347,10 @@ export default class DieHardFudgeDialog extends FormApplication {
     let whoId = event.currentTarget.dataset.who;
     let fudgeId = event.currentTarget.dataset.fudge;
     let who = this._getWho(whoId)
-    let whoFudges = who.getFlag('foundry-die-hard', 'fudges')
+    let whoFudges = who.getFlag('lightning-corrector', 'fudges')
     let fudgeIndex = whoFudges.findIndex(element => { return element.id === fudgeId;});
     whoFudges[fudgeIndex].statusActive = !whoFudges[fudgeIndex].statusActive
-    who.setFlag('foundry-die-hard', 'fudges', whoFudges);
+    who.setFlag('lightning-corrector', 'fudges', whoFudges);
     this.render()
   }
 
@@ -362,10 +362,10 @@ export default class DieHardFudgeDialog extends FormApplication {
     let whoId = event.currentTarget.dataset.who;
     let fudgeId = event.currentTarget.dataset.fudge;
     let who = this._getWho(whoId)
-    let whoFudges = who.getFlag('foundry-die-hard', 'fudges')
+    let whoFudges = who.getFlag('lightning-corrector', 'fudges')
     let fudgeIndex = whoFudges.findIndex(element => { return element.id === fudgeId;});
     whoFudges[fudgeIndex].statusEndless = !whoFudges[fudgeIndex].statusEndless
-    who.setFlag('foundry-die-hard', 'fudges', whoFudges);
+    who.setFlag('lightning-corrector', 'fudges', whoFudges);
     this.render()
   }
 

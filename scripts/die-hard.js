@@ -47,5 +47,5 @@ Hooks.on('renderChatLog', (app, html, data) => {
 });
 
 Hooks.once('devModeReady', ({ registerPackageDebugFlag }) => {
-  registerPackageDebugFlag('foundry-die-hard');
+  registerPackageDebugFlag('lightning-corrector');
 });

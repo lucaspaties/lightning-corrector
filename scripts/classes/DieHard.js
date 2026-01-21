@@ -2,7 +2,7 @@ import {dieHardLog, insertAfter} from '../lib/helpers.js';
 import DieHardFudgeDialog from './DieHardFudgeDialog.js';
 import DieHardPf2e from './DieHardPf2e.js';
 
-export const DieHardSetting = (setting) => game.settings.get('foundry-die-hard', setting);
+export const DieHardSetting = (setting) => game.settings.get('lightning-corrector', setting);
 
 export default class DieHard {
 
@@ -80,7 +80,7 @@ export default class DieHard {
     }
 
     // Enables fudge
-    game.settings.register('foundry-die-hard', 'fudgeEnabled', {
+    game.settings.register('lightning-corrector', 'fudgeEnabled', {
       name: 'Fudge Enabled',
       hint: 'Enable the Fudge functionality',
       scope: 'world',
@@ -91,7 +91,7 @@ export default class DieHard {
     });
 
     // Enables debug die
-    game.settings.register('foundry-die-hard', 'debugDieResultEnabled', {
+    game.settings.register('lightning-corrector', 'debugDieResultEnabled', {
       name: 'Debug Die Result Enabled',
       hint: 'Enable the use of Debug Die Result',
       scope: 'world',
@@ -100,7 +100,7 @@ export default class DieHard {
       type: Boolean
     });
 
-    game.settings.register('foundry-die-hard', 'debugDieResult', {
+    game.settings.register('lightning-corrector', 'debugDieResult', {
       name: 'Debug Die Result',
       hint: 'Make every initial roll of die value',
       scope: 'world',
@@ -114,7 +114,7 @@ export default class DieHard {
       }
     });
 
-    game.settings.register('foundry-die-hard', 'dieHardSettings', {
+    game.settings.register('lightning-corrector', 'dieHardSettings', {
       name: '',
       default: DieHard.getDefaultDieHardSettings(),
       type: Object,
@@ -179,14 +179,14 @@ export default class DieHard {
       blind: true,
       content: message,
       whisper: gmUsers.map(u => u.id),
-      flags: {'foundry-die-hard': {dieHardWhisper: true}}
+      flags: {'lightning-corrector': {dieHardWhisper: true}}
     });
   }
 
   static hideDieHardWhisper(message, html) {
     dieHardLog(false, 'DieHard.hideDieHardWhisper');
     try {
-      if (!game.user.isGM && message.getFlag('foundry-die-hard', 'dieHardWhisper')) {
+      if (!game.user.isGM && message.getFlag('lightning-corrector', 'dieHardWhisper')) {
         html.addClass('die-hard-blind-whisper');
       }
     } catch (e) {

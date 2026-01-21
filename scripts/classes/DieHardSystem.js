@@ -8,11 +8,11 @@ export default class DieHardSystem {
     dieHardLog(false, 'DieHardSystem.constructor - Foundry version:', game.version);
 
     // Total rolls - v13 uses CONFIG.Dice.Roll
-    libWrapper.register('foundry-die-hard', 'CONFIG.Dice.Roll.prototype.evaluate', this.wrapRollEvaluate, 'WRAPPER');
+    libWrapper.register('lightning-corrector', 'CONFIG.Dice.Roll.prototype.evaluate', this.wrapRollEvaluate, 'WRAPPER');
 
     // Raw rolls - v13 uses CONFIG.Dice.termTypes.DiceTerm
     if (CONFIG.Dice.termTypes?.DiceTerm) {
-      libWrapper.register('foundry-die-hard', 'CONFIG.Dice.termTypes.DiceTerm.prototype.roll', this.wrapDiceTermRoll, 'MIXED');
+      libWrapper.register('lightning-corrector', 'CONFIG.Dice.termTypes.DiceTerm.prototype.roll', this.wrapDiceTermRoll, 'MIXED');
     }
 
     // Register the fudge roll class
@@ -79,7 +79,7 @@ export default class DieHardSystem {
   getUserFudge(fudgeType) {
     dieHardLog(false, 'DieHardSystem.getUserFudge');
     const currentUser = game.user;
-    let userFudges = currentUser.getFlag('foundry-die-hard', 'fudges');
+    let userFudges = currentUser.getFlag('lightning-corrector', 'fudges');
     dieHardLog(false, 'DieHardSystem.getUserFudge - userFudges', userFudges);
     if (!Array.isArray(userFudges)) {
       return null
@@ -98,12 +98,12 @@ export default class DieHardSystem {
   disableUserFudge(fudgeId) {
     dieHardLog(false, 'DieHardSystem.disableUserFudge');
     const currentUser = game.user;
-    let userFudges = currentUser.getFlag('foundry-die-hard', 'fudges');
+    let userFudges = currentUser.getFlag('lightning-corrector', 'fudges');
     let fudgeIndex = userFudges.findIndex(element => {
       return (element.id === fudgeId);
     });
     userFudges[fudgeIndex].statusActive = false
-    currentUser.setFlag('foundry-die-hard', 'fudges', userFudges);
+    currentUser.setFlag('lightning-corrector', 'fudges', userFudges);
     DieHard.refreshDieHardIcons()
   }
 
@@ -296,7 +296,7 @@ export default class DieHardSystem {
    */
   getUsers(activeOnly = true, includeFudges = false, getGM = false, userId = null) {
     dieHardLog(false, 'DieHardSystem : getUsers', activeOnly, includeFudges, getGM, userId);
-    if (game.settings.get('foundry-die-hard', 'dieHardSettings').debug.allActors) {
+    if (game.settings.get('lightning-corrector', 'dieHardSettings').debug.allActors) {
       activeOnly = false;
     }
     let activeUsers = [];
@@ -310,7 +310,7 @@ export default class DieHardSystem {
         if (!(curUserType) && curUser.active) {
           let newUser = { id: userId, name: curUser.name };
           if (includeFudges) {
-            newUser.fudges = curUser.getFlag('foundry-die-hard', 'fudges')
+            newUser.fudges = curUser.getFlag('lightning-corrector', 'fudges')
             if (!Array.isArray(newUser.fudges)){
               newUser.fudges = []
             }
@@ -321,7 +321,7 @@ export default class DieHardSystem {
         if (!(curUserType)) {
           let newUser = { id: userId, name: curUser.name };
           if (includeFudges) {
-            newUser.fudges = curUser.getFlag('foundry-die-hard', 'fudges')
+            newUser.fudges = curUser.getFlag('lightning-corrector', 'fudges')
             if (!Array.isArray(newUser.fudges)){
               newUser.fudges = []
             }
@@ -421,9 +421,9 @@ export default class DieHardSystem {
     let users = game.dieHardSystem.getUsers(false);
     for (let user in users) {
       try {
-        game.users.get(users[user].id).setFlag('foundry-die-hard', 'fudges', null)
-        game.users.get(users[user].id).setFlag('foundry-die-hard', 'activeFudges', null)
-        game.users.get(users[user].id).setFlag('foundry-die-hard', 'userFudges', null)
+        game.users.get(users[user].id).setFlag('lightning-corrector', 'fudges', null)
+        game.users.get(users[user].id).setFlag('lightning-corrector', 'activeFudges', null)
+        game.users.get(users[user].id).setFlag('lightning-corrector', 'userFudges', null)
       } catch (e) {
       }
     }
@@ -432,19 +432,19 @@ export default class DieHardSystem {
     let gms = game.dieHardSystem.getUsers(false, false, true);
     for (let user in gms) {
       try {
-        game.users.get(gms[user].id).setFlag('foundry-die-hard', 'fudges', null)
-        game.users.get(gms[user].id).setFlag('foundry-die-hard', 'activeFudges', null)
-        game.users.get(gms[user].id).setFlag('foundry-die-hard', 'userFudges', null)
+        game.users.get(gms[user].id).setFlag('lightning-corrector', 'fudges', null)
+        game.users.get(gms[user].id).setFlag('lightning-corrector', 'activeFudges', null)
+        game.users.get(gms[user].id).setFlag('lightning-corrector', 'userFudges', null)
       } catch (e) {
       }
     }
   }
 
   disableAllFudges() {
-    dieHardLog(false, 'DieHardSystem : disableAllFudges', game.settings.get('foundry-die-hard', 'dieHardSettings').fudgeConfig.globallyDisabled)
-    let settings = game.settings.get('foundry-die-hard', 'dieHardSettings')
+    dieHardLog(false, 'DieHardSystem : disableAllFudges', game.settings.get('lightning-corrector', 'dieHardSettings').fudgeConfig.globallyDisabled)
+    let settings = game.settings.get('lightning-corrector', 'dieHardSettings')
     settings.fudgeConfig.globallyDisabled = !settings.fudgeConfig.globallyDisabled
-    game.settings.set('foundry-die-hard', 'dieHardSettings', settings)
+    game.settings.set('lightning-corrector', 'dieHardSettings', settings)
     DieHard.refreshDieHardIcons(settings.fudgeConfig.globallyDisabled);
   }
 
